@@ -56,7 +56,7 @@ fi
 awk -v pw="${POSTGRES_PASSWORD}" '
   BEGIN {r=0}
   /^database:/ {
-    print "database:\n  name: psycopg2\n  args:\n    user: synapse\n    password: " pw "\n    database: synapse\n    host: postgres\n    port: 5432\n    cp_min: 5\n    cp_max: 10"
+    print "database:\n  name: psycopg2\n  args:\n    user: synapse\n    password: " pw "\n    database: synapse\n    host: postgres\n    port: 5432\n    cp_min: 5\n    cp_max: 10\n    allow_unsafe_locale: true"
     r=1; next
   }
   r && /^#/ {r=0}
@@ -125,8 +125,8 @@ keys:
 turn:
   enabled: true
   domain: turn.${DOMAIN}
-  secret: ${AUTH_SECRET}
-  port: 3478
+  auth_secret: ${AUTH_SECRET}
+  udp_port: 3478
   tls_port: 5349
 EOF
 
@@ -173,7 +173,7 @@ EOF
 
 # 8a. Pre‑generate the app‑service registration
 docker run --rm -v "$(pwd)/synapse/mautrix-whatsapp:/data" \
-  dock.mau.dev/mautrix/whatsapp:latest \
+dock.mau.dev/mautrix/whatsapp:sqlite-latest \
   /usr/bin/mautrix-whatsapp -g -c /data/config.yaml -r /data/wa-registration.yaml
 
 # 8b. Tell Synapse to load the registration exactly once
@@ -194,6 +194,7 @@ services:
     environment:
       POSTGRES_DB: synapse
       POSTGRES_USER: synapse
+      POSTGRES_INITDB_ARGS: "--locale=C"
     volumes: [ "./data/postgres:/var/lib/postgresql/data" ]
 
   synapse:
@@ -218,7 +219,7 @@ services:
       traefik.http.routers.element.entrypoints: "websecure"
 
   mautrix-whatsapp:
-    image: dock.mau.dev/mautrix/whatsapp:latest
+    image: dock.mau.dev/mautrix/whatsapp:sqlite-latest
     restart: unless-stopped
     volumes: [ "./mautrix-whatsapp:/data" ]
     labels:
