@@ -48,6 +48,7 @@ if [ ! -f synapse/data/synapse/homeserver.yaml ]; then
   echo "→ Generating homeserver.yaml"
   docker run --rm -v "$(pwd)/synapse/data/synapse:/data" \
       -e SYNAPSE_SERVER_NAME=${DOMAIN} \
+      -e SYNAPSE_REPORT_STATS=no \
       matrixdotorg/synapse:latest generate
 fi
 
@@ -60,9 +61,14 @@ awk -v pw="${POSTGRES_PASSWORD}" '
   }
   r && /^#/ {r=0}
   !r {print}
+
 ' synapse/data/synapse/homeserver.yaml > /tmp/hs && mv /tmp/hs synapse/data/synapse/homeserver.yaml
 
-# 3b. Explicitly opt‑out of stats (fixes reboot loop)
+# 3b. ensure media store lives under /data
+grep -q '^media_store_path:' synapse/data/synapse/homeserver.yaml || \
+  sed -i '1imedia_store_path: /data/media_store' synapse/data/synapse/homeserver.yaml
+
+# 3c. Explicitly opt‑out of stats (fixes reboot loop)
 grep -q '^report_stats:' synapse/data/synapse/homeserver.yaml || \
   sed -i '1ireport_stats: false' synapse/data/synapse/homeserver.yaml
 
@@ -167,7 +173,8 @@ EOF
 
 # 8a. Pre‑generate the app‑service registration
 docker run --rm -v "$(pwd)/synapse/mautrix-whatsapp:/data" \
-  dock.mau.dev/mautrix/whatsapp:latest -g -c /data/config.yaml -r /data/wa-registration.yaml
+  dock.mau.dev/mautrix/whatsapp:latest \
+  /usr/bin/mautrix-whatsapp -g -c /data/config.yaml -r /data/wa-registration.yaml
 
 # 8b. Tell Synapse to load the registration exactly once
 grep -q 'wa-registration.yaml' synapse/data/synapse/homeserver.yaml || \
